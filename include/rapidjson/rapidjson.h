@@ -520,6 +520,32 @@ enum Type {
 	kNumberType = 6		//!< number
 };
 
+namespace detail {
+
+	template<bool, class T = void>
+	struct enable_if;
+
+	template<class T>
+	struct enable_if<true, T> {
+		typedef T type;
+	};
+
+} // namespace detail
+
+template<class Char>
+inline
+typename detail::enable_if<sizeof(Char) == 1, bool>::type
+is_byte(const Char& ch) {
+	return true;
+}
+
+template<class Char>
+inline
+typename detail::enable_if<(sizeof(Char) > 1), bool>::type
+is_byte(const Char& ch) {
+	return ch < 256;
+}
+
 } // namespace rapidjson
 
 #endif // RAPIDJSON_RAPIDJSON_H_
