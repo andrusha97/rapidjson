@@ -37,7 +37,8 @@ namespace rapidjson {
 //! Combination of parseFlags
 enum ParseFlag {
 	kParseDefaultFlags = 0,			//!< Default parse flags. Non-destructive parsing. Text strings are decoded into allocated buffer.
-	kParseInsituFlag = 1			//!< In-situ(destructive) parsing.
+	kParseInsituFlag = 1,			//!< In-situ(destructive) parsing.
+	kParseStreamFlag = 1 << 1		//!< Allow stream to contain something after root object.
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -246,7 +247,7 @@ public:
 			}
 			SkipWhitespace(stream);
 
-			if (stream.Peek() != '\0')
+			if ((parseFlags & kParseStreamFlag) == 0 && stream.Peek() != '\0')
 				RAPIDJSON_PARSE_ERROR("Nothing should follow the root object or array.", stream.Tell());
 		}
 
