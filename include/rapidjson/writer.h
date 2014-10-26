@@ -14,13 +14,22 @@
 
 namespace rapidjson {
 
+///////////////////////////////////////////////////////////////////////////////
+// SerializeFlag
+
+//! Combination of serializeFlags
+enum SerializeFlag {
+	kSerializeDefaultFlags = 0,			//!< Default serialization flags. Only objects and arrays are allowed to be serialized.
+	kSerializeAnyValueFlag = 1			//!< Allow non-object values to be serialized.
+};
+
 //! JSON writer
 /*! Writer implements the concept Handler.
 	It generates JSON text by events to an output stream.
 
 	User may programmatically calls the functions of a writer to generate JSON text.
 
-	On the other side, a writer can also be passed to objects that generates events, 
+	On the other side, a writer can also be passed to objects that generates events,
 
 	for example Reader::Parse() and Document::Accept().
 
@@ -33,8 +42,15 @@ class Writer {
 public:
 	typedef typename Encoding::Ch Ch;
 
-	Writer(Stream& stream, Allocator* allocator = 0, size_t levelDepth = kDefaultLevelDepth) : 
-		stream_(stream), level_stack_(allocator, levelDepth * sizeof(Level)) {}
+	Writer(Stream& stream, Allocator* allocator = 0, size_t levelDepth = kDefaultLevelDepth) :
+		stream_(stream),
+		level_stack_(allocator, levelDepth * sizeof(Level)),
+		flags_(kSerializeDefaultFlags)
+	{ }
+
+	void SetFlags(unsigned flags) {
+		flags_ = flags;
+	}
 
 	//@name Implementation of Handler
 	//@{
@@ -211,7 +227,7 @@ protected:
 		if (level_stack_.GetSize() != 0) { // this value is not at root
 			Level* level = level_stack_.template Top<Level>();
 			if (level->valueCount > 0) {
-				if (level->inArray) 
+				if (level->inArray)
 					stream_.Put(','); // add comma if it is not the first element in array
 				else  // in object
 					stream_.Put((level->valueCount % 2 == 0) ? ',' : ':');
@@ -220,12 +236,13 @@ protected:
 				RAPIDJSON_ASSERT(type == kStringType);  // if it's in object, then even number should be a name
 			level->valueCount++;
 		}
-		else
+		else if ((flags_ & kSerializeAnyValueFlag) == 0)
 			RAPIDJSON_ASSERT(type == kObjectType || type == kArrayType);
 	}
 
 	Stream& stream_;
 	internal::Stack<Allocator> level_stack_;
+	unsigned flags_;
 
 private:
 	// Prohibit assignment for VC C4512 warning
