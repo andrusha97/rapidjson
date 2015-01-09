@@ -38,7 +38,8 @@ namespace rapidjson {
 enum ParseFlag {
 	kParseDefaultFlags = 0,			//!< Default parse flags. Non-destructive parsing. Text strings are decoded into allocated buffer.
 	kParseInsituFlag = 1,			//!< In-situ(destructive) parsing.
-	kParseStreamFlag = 1 << 1		//!< Allow stream to contain something after root object.
+	kParseStreamFlag = 1 << 1,		//!< Allow stream to contain something after root object.
+	kParseCommentsFlag = 1 << 2		//!< Support of /* */ comments.
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -235,7 +236,7 @@ public:
 			return false;
 		}
 
-		SkipWhitespace(stream);
+		SkipComments<parseFlags>(stream);
 
 		if (stream.Peek() == '\0')
 			RAPIDJSON_PARSE_ERROR("Text only contains white space(s)", stream.Tell());
@@ -248,7 +249,7 @@ public:
 					RAPIDJSON_PARSE_ERROR("Expect either an object or array at root", stream.Tell());
 				}
 			}
-			SkipWhitespace(stream);
+			SkipComments<parseFlags>(stream);
 
 			if ((parseFlags & kParseStreamFlag) == 0 && stream.Take() != '\0')
 				RAPIDJSON_PARSE_ERROR("Nothing should follow the root object or array.", stream.Tell());
@@ -262,13 +263,36 @@ public:
 	size_t GetErrorOffset() const { return errorOffset_; }
 
 private:
+	// Skip whitespaces and comments.
+	template<unsigned parseFlags, typename Stream>
+	void SkipComments(Stream& stream) {
+		SkipWhitespace(stream);
+
+		if (parseFlags & kParseCommentsFlag) {
+			while (stream.Peek() == '/') {
+				stream.Take();
+
+				if (stream.Take() != '*') {
+					RAPIDJSON_PARSE_ERROR("Comments must start with /*", stream.Tell());
+					break;
+				}
+
+				while (stream.Take() != '*' || stream.Take() != '/') {
+					// Do nothing because of that awful logical expression with side effects.
+				}
+
+				SkipWhitespace(stream);
+			}
+		}
+	}
+
 	// Parse object: { string : value, ... }
 	template<unsigned parseFlags, typename Stream, typename Handler>
 	void ParseObject(Stream& stream, Handler& handler) {
 		RAPIDJSON_ASSERT(stream.Peek() == '{');
 		stream.Take();	// Skip '{'
 		handler.StartObject();
-		SkipWhitespace(stream);
+		SkipComments<parseFlags>(stream);
 
 		if (stream.Peek() == '}') {
 			stream.Take();
@@ -284,21 +308,21 @@ private:
 			}
 
 			ParseString<parseFlags>(stream, handler);
-			SkipWhitespace(stream);
+			SkipComments<parseFlags>(stream);
 
 			if (stream.Take() != ':') {
 				RAPIDJSON_PARSE_ERROR("There must be a colon after the name of object member", stream.Tell());
 				break;
 			}
-			SkipWhitespace(stream);
+			SkipComments<parseFlags>(stream);
 
 			ParseValue<parseFlags>(stream, handler);
-			SkipWhitespace(stream);
+			SkipComments<parseFlags>(stream);
 
 			++memberCount;
 
 			switch(stream.Take()) {
-				case ',': SkipWhitespace(stream); break;
+				case ',': SkipComments<parseFlags>(stream); break;
 				case '}': handler.EndObject(memberCount); return;
 				default:  RAPIDJSON_PARSE_ERROR("Must be a comma or '}' after an object member", stream.Tell());
 			}
@@ -311,7 +335,7 @@ private:
 		RAPIDJSON_ASSERT(stream.Peek() == '[');
 		stream.Take();	// Skip '['
 		handler.StartArray();
-		SkipWhitespace(stream);
+		SkipComments<parseFlags>(stream);
 
 		if (stream.Peek() == ']') {
 			stream.Take();
@@ -322,10 +346,10 @@ private:
 		for (SizeType elementCount = 0;;) {
 			ParseValue<parseFlags>(stream, handler);
 			++elementCount;
-			SkipWhitespace(stream);
+			SkipComments<parseFlags>(stream);
 
 			switch (stream.Take()) {
-				case ',': SkipWhitespace(stream); break;
+				case ',': SkipComments<parseFlags>(stream); break;
 				case ']': handler.EndArray(elementCount); return;
 				default:  RAPIDJSON_PARSE_ERROR("Must be a comma or ']' after an array element.", stream.Tell());
 			}
