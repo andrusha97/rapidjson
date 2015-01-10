@@ -272,13 +272,21 @@ private:
 			while (stream.Peek() == '/') {
 				stream.Take();
 
-				if (stream.Take() != '*') {
-					RAPIDJSON_PARSE_ERROR("Comments must start with /*", stream.Tell());
-					break;
-				}
+				if (stream.Peek() == '*') {
+					stream.Take();
 
-				while (stream.Take() != '*' || stream.Take() != '/') {
-					// Do nothing because of that awful logical expression with side effects.
+					while (stream.Take() != '*' || stream.Take() != '/') {
+						// Do nothing because of that awful logical expression with side effects.
+					}
+				} else if (stream.Peek() == '/') {
+					stream.Take();
+
+					while (stream.Take() != '\n') {
+						// Empty.
+					}
+				} else {
+					RAPIDJSON_PARSE_ERROR("Comments must start with /* or //", stream.Tell());
+					break;
 				}
 
 				SkipWhitespace(stream);
